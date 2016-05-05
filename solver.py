@@ -1,8 +1,7 @@
-movesString="""A NTH-Bel 400
-A NTH-NWG 200
-A NTH-HI 300
-NWG H 0
-NWG H 50
+movesString="""A NTH-Bel 2
+A Pic-Bel 2
+A Pic-Bur 2
+Bel H
 A NWG S NTH - EDI 100
 """
 import random
@@ -67,6 +66,8 @@ for prov in provinces:
 from collections import Counter
 def playGame():
   moves = []
+
+  # get this game's moves
   for prov in provinceToMovesMap.keys():
     movesForProvince = provinceToMovesMap[prov]
     probSum = sum([m.prob for m in movesForProvince])
@@ -85,6 +86,16 @@ def playGame():
         moves.append(m)
         break
   print [(x.province, x.origin, x.dest) for x in moves]
+
+  # get destination map
+  destToMovesMap = dict()
+  for dest in [m.dest for m in moves]:
+    if dest not in destToMovesMap:
+      destToMovesMap[dest] = []
+    destToMovesMap[dest].append(m)
+
+  print destToMovesMap
+
 
 # print [(x.origin, x.dest) for x in allMoveList]
 # playGame()
