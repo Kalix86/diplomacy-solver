@@ -1,68 +1,42 @@
 movesString="""
-[ a 1
 F NTH S Hol
-]
-[ a 1
 A Hol - Bel
-]
 
 A Hol H
 F NTH - Bel
-
-[ b 1
 A Ruh S Bel - Hol
 Bel-Hol
-]
-[b 1
 Bel
-]
 F Swe - BAL
 A Sil - Ber
 A Sil - War
-[c 1
 A Sil S Kie - Mun
-]
 A Kie - Mun
 A Hol S Kie
 A Kie - Ber
 A Kie - Hol
 A Par - Bre
 A Kie S Hol
-[c 1
 A Kie S Sil - Mun
 A Sil - Mun
-]
 A Mun H
-[d 10
   A Ber S Tyr - Mun
   A Tyr - Mun 10
-]
-[d 6
 A Tyr S Ber - Mun 6
 A Ber - Mun
-]
-
 A Bur - Gas 5
 A Bur - Par 6
-[e 4
 A Bur - Mun 4
 A Ruh S Bur - Mun 4
-]
 A Edi
 A Lon
 A Mos - War
 A Pru - Sil 4
 A Pru - Ber 10
 A Ruh - Kie 1
-[f 10
 F Bel S Ruh - Hol 10
 A Ruh - Hol 10
-]
-[f 10
 A Ruh S Bel 10
-F Bel S Ruh - Hol 10
-A Ruh - Hol 10
-]
 A Stp S NWG - Nwy
 F BAR S NWG - Nwy
 F Bel - Hol 5
@@ -110,8 +84,6 @@ class Move(object):
     self.isSupporting = isSupporting
     self.moveFailed = None
     self.finalDest = None
-    self.group = None
-    self.groupProb = None
     self.numSupports = 0
     self.isExtraHoldingMove = isExtraHoldingMove
 
@@ -129,24 +101,11 @@ class Move(object):
         return self.province + ' S ' + self.origin
       return self.province + ' S ' + self.origin + '-' + self.dest
 
-import uuid
-def getID():
-  return str(uuid.uuid4())
 
 allMoveList = list()
-group = None
 for l in movesString.split('\n'):
-  l = l.strip()
-  if len(l) == 0: continue
+  if len(l) <= 2: continue
   prob, province, origin, dest, isSupporting = 1.0, None, None, None, False
-  if '[' in l:
-    groupProb = float(startGroupPattern.search(l).group(2))
-    group = startGroupPattern.search(l).group(1)
-    groupID = getID()
-    continue
-  if l.strip() == ']':
-    group = None
-    continue
 
   if supportMovePattern.match(l):
     province, origin, dest = supportMovePattern.search(l).group(2),  supportMovePattern.search(l).group(3), supportMovePattern.search(l).group(4)
@@ -171,93 +130,40 @@ for l in movesString.split('\n'):
   else:
     prob = float(prob)
 
-  toAppend = Move(province, origin, dest, prob, isSupporting)
-  if group is not None:
-    prob = None
-    toAppend.group = group
-    toAppend.groupProb = groupProb
-    toAppend.groupID = groupID
-
-  allMoveList.append(toAppend)
+  allMoveList.append(Move(province, origin, dest, prob, isSupporting))
 
 provinces = list(set([m.province for m in allMoveList]))
 provinceToMovesMap = dict()
-import pdb
 
 for prov in provinces:
-  group = None
-  # pdb.set_trace()
+  provinceToMovesMap[prov] = [m for m in allMoveList if m.province == prov]
 
-  for m in [m for m in allMoveList if m.province == prov]:
-    if m.group and len(m.group) > 1:
-    # if m.group:
-      group = m.group
-  if group is None:
-    group = getID()[:2]
-  for m in [m for m in allMoveList if m.province == prov]:
-    m.group = group
-    if not m.groupProb:
-      m.groupID = getID()
-      m.groupProb = m.prob
-
-# print [(m.s(), m.group, m.groupID[:4], m.groupProb) for m in allMoveList]
-
-groupNames = set([x.group for x in allMoveList])
-groupNamesToGroup = dict()
-for name in groupNames:
-  if name not in groupNamesToGroup:
-    groupNamesToGroup[name] = []
-  groupIDs = set([m.groupID for m in allMoveList if m.group == name])
-  for groupID in groupIDs:
-    groupNamesToGroup[name].append([m for m in allMoveList if m.groupID == groupID])
-
-
+from collections import Counter
 def playGame():
   moves = []
 
   # get this game's moves
-  # choose only one groupID for each group
-  for groupName in groupNamesToGroup:
-    groupProbSum = 0.0
-    for group in groupNamesToGroup[groupName]:
-      # group is an array of moves
-      groupProb = group[0].groupProb
-      groupProbSum += groupProb
+  for prov in provinceToMovesMap.keys():
+    movesForProvince = provinceToMovesMap[prov]
+    probSum = sum([m.prob for m in movesForProvince])
 
     randomFloat = random.random()
     runningP = 0.0
-    for group in groupNamesToGroup[groupName]:
-      p = group[0].groupProb / groupProbSum
+    for m in movesForProvince:
+      p = m.prob / probSum
       runningP += p
 
       if randomFloat <= runningP:
-        # choose this group of moves
-        for m in group:
-          if m.isSupporting:
-            moves.append(Move(m.province, m.province, m.province, m.prob, False, isExtraHoldingMove=True))
-          moves.append(m)
+        # choose this move
+        if m.isSupporting:
+          moves.append(Move(m.province, m.province, m.province, m.prob, False, isExtraHoldingMove=True))
+        moves.append(m)
         break
-
-  # delete rules from the same province
-  deleteList = []
-  for m1, m2 in itertools.combinations(moves, 2):
-    p1 = m1.groupProb or m1.prob
-    p2 = m2.groupProb or m2.prob
-    if m1.province == m2.province:
-      if random.random() <= p1 / (p1 + p2):
-        # m1 survives
-        deleteList.append(m2)
-      else:
-        deleteList.append(m1)
-  moves = [m for m in moves if m not in deleteList]
-
-
+  # print [(x.province, x.origin, x.dest) for x in moves]
 
   # get destination map
   destToMovesMap = dict()
   for dest, m in [(m.dest, m) for m in moves]:
-    # if dest == 'Mun' or dest=='Ber':
-    #   m.p()
     if dest not in destToMovesMap:
       destToMovesMap[dest] = []
     destToMovesMap[dest].append(m)
@@ -360,7 +266,7 @@ def scoreGame(myMoves, SCsILost, SCsIGained):
   return -SCsILost * 1.12 + SCsIGained
 
 movesToScoresMap = dict()
-for i in range(10000):
+for i in range(50000):
   myMoves, SCsILost, SCsIGained = playGame()
   myMovesStr = ", ".join(myMoves)
   if myMovesStr not in movesToScoresMap:
