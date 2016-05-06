@@ -1,6 +1,26 @@
 movesString="""
-A NTH-Bel 2
-A Pic-Bel 2
+A Bel H
+A Bur - Par
+A Hol S Bel
+F Swe S Nwy
+F Nwy H
+F NTH S Nwy
+A Ber - Pru
+A Mun - Sil
+
+A Tyr - Mun
+A Ruh - Hol
+A Mar - Bur
+F ENG S Pic - Bel
+F Pic - Bel
+
+F BAR S Stp - Nwy
+A Vie - Tyr
+A Pru S Sil - Ber
+F NWG S Stp - Nwy
+A Stp - Nwy
+F Bul/ec H
+A Sil - Ber
 """
 # A Pic-Bur 2
 # Bel H
@@ -12,6 +32,11 @@ A Pic-Bel 2
 # A Mar S Pic-Bel 2
 # A Ber S Pic-Bel 2
 # A Mun S Pic-Bel 2
+
+MY_PROVINCES = 'Bel Bur Hol Swe Nwy NTH Ber Mun'.split()
+MY_SUPPLY_CENTERS = 'Bel Hol Kie Ber Den Mun Nwy Swe'.split()
+
+SUPPLY_CENTERS = 'Edi Lvp Lon Bel Hol Kie Ber Nwy Swe Den Stp Mos Sev Rum Bul Con Ank Smy AEG Gre Ser Nap Rom Tus Ven Tri Mar Pic Spa Por Bre Mun Vie War Bud Par'.split()
 
 import random
 import re
@@ -41,16 +66,19 @@ class Move(object):
     self.prob = prob
     self.isSupporting = isSupporting
     self.moveFailed = None
+    self.finalDest = None
     self.numSupports = 0
 
   def p(self):
     print self.s()
   def s(self):
     if self.origin == self.province == self.dest:
-      return self.province + ' holds '
+      return self.province + ' holds'
     if self.origin == self.province != self.dest:
       return self.province + '-' + self.dest
     if self.origin != self.province != self.dest:
+      if self.origin == self.dest:
+        return self.province + ' S ' + self.origin
       return self.province + ' S ' + self.origin + '-' + self.dest
 
 
@@ -98,16 +126,12 @@ def playGame():
   for prov in provinceToMovesMap.keys():
     movesForProvince = provinceToMovesMap[prov]
     probSum = sum([m.prob for m in movesForProvince])
-    if prov == 'NWG':
-      print probSum
 
     randomFloat = random.random()
     runningP = 0.0
     for m in movesForProvince:
       p = m.prob / probSum
       runningP += p
-      if prov == 'NWG':
-        print randomFloat, '<=', runningP
 
       if randomFloat <= runningP:
         # choose this move
@@ -115,7 +139,7 @@ def playGame():
           moves.append(Move(m.province, m.province, m.province, m.prob, False))
         moves.append(m)
         break
-  print [(x.province, x.origin, x.dest) for x in moves]
+  # print [(x.province, x.origin, x.dest) for x in moves]
 
   # get destination map
   destToMovesMap = dict()
@@ -124,20 +148,70 @@ def playGame():
       destToMovesMap[dest] = []
     destToMovesMap[dest].append(m)
 
-  # cut supports first
+  # cut supports
   for dest in destToMovesMap.keys():
-    supports = [m for m in destToMovesMap[dest] if m.isSupporting and not m.moveFailed]
-    actualMoves = [m for m in destToMovesMap[dest] if not m.isSupporting]
+    nonSupportingMoves = [m for m in destToMovesMap[dest] if not m.isSupporting]
+    for m in nonSupportingMoves:
+      attackedSupports = [x for x in moves if x.isSupporting and x.province == m.dest and m.origin != m.dest]
+      for x in attackedSupports:
+        x.moveFailed = True
+        print x.s(), 'failed!'
+
+  # execute moves
+  for dest in destToMovesMap.keys():
+    successfulSupportsToDest = [m for m in destToMovesMap[dest] if m.isSupporting and not m.moveFailed]
+    nonSupportingMovesToDest = [m for m in destToMovesMap[dest] if not m.isSupporting]
     maxPower = 0
-    for m in actualMoves:
-      movesSupportingThisOne = [x for x in supports if x.origin == m.origin]
-      m.numSupports = len(movesSupportingThisOne)
+    for m in nonSupportingMovesToDest:
+      movesSupportingThisOneToDest = [x for x in successfulSupportsToDest if x.origin == m.origin]
+      m.numSupports = len(movesSupportingThisOneToDest)
       if m.numSupports > maxPower:
         maxPower = m.numSupports
 
-    tiedMoves = [m for m in actualMoves if m.numSupports == maxPower]
-    print tiedMoves[0].s()
+    topMoves = [m for m in nonSupportingMovesToDest if m.numSupports == maxPower]
+    lesserMoves = [m for m in nonSupportingMovesToDest if m.numSupports < maxPower]
 
+    assert(len(topMoves) > 0)
+    if len(topMoves) == 1:
+      topMoves[0].finalDest = topMoves[0].dest
+      print topMoves[0].s(), 'succeeds! numSupports:', topMoves[0].numSupports
+    else:
+      for x in topMoves:
+        if x.origin == x.dest:
+          x.finalDest = x.dest
+          print x.s(), 'succeeds! numSupports:', x.numSupports
+        else:
+          x.moveFailed = True
+          x.finalDest = x.origin
+          print x.s(), 'bounces! numSupports:', x.numSupports
+
+    for x in lesserMoves:
+      x.moveFailed = True
+      if x.origin == x.dest:
+        x.finalDest = 'RETREAT'
+        print x.s(), 'fails! numSupports:', x.numSupports
+      else:
+        x.finalDest = x.origin
+        print x.s(), 'fails! numSupports:', x.numSupports
+
+    # print x.s(), x.moveFailed
+
+  # score this game
+  nonSupportingMoves = [m for m in moves if not m.isSupporting]
+
+  SCsILost = [x.finalDest for x in nonSupportingMoves if x.finalDest in MY_SUPPLY_CENTERS and x.province not in MY_PROVINCES]
+  SCsIGained = [x.finalDest for x in nonSupportingMoves if (x.finalDest not in MY_SUPPLY_CENTERS) and (x.province in MY_PROVINCES) and (x.finalDest in SUPPLY_CENTERS)]
+
+  # for m in nonSupportingMoves:
+  #   print m.finalDest, 'm.finalDest in MY_SUPPLY_CENTERS:', m.finalDest in MY_SUPPLY_CENTERS, m.province, 'm.province not in MY_PROVINCES:', m.province not in MY_PROVINCES
+  #   print m.finalDest, 'm.finalDest not in MY_SUPPLY_CENTERS:', m.finalDest not in MY_SUPPLY_CENTERS, m.province, 'm.province in MY_PROVINCES:', m.province in MY_PROVINCES, 'm.finalDest in SUPPLY_CENTERS:',m.finalDest in SUPPLY_CENTERS
+  #   print  m.finalDest not in MY_SUPPLY_CENTERS and m.province in MY_PROVINCES and m.finalDest in SUPPLY_CENTERS
+  #   print ''
+
+  print 'started with', len(MY_SUPPLY_CENTERS), 'SCs. Lost:', len(SCsILost), 'Gained:', len(SCsIGained)
+
+  print SCsILost
+  print SCsIGained
 
 # print [(x.origin, x.dest) for x in allMoveList]
 # playGame()
