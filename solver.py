@@ -8,6 +8,14 @@ F NTH S Nwy
 A Ber - Pru
 A Mun - Sil
 
+Hol-Ruh
+Hol-Kie
+Ber-Kie
+Mun-Kie
+Mun S Ber
+Ber S Mun
+Bur S Bel
+
 A Tyr - Mun
 A Ruh - Hol
 A Mar - Bur
@@ -22,16 +30,7 @@ A Stp - Nwy
 F Bul/ec H
 A Sil - Ber
 """
-# A Pic-Bur 2
-# Bel H
-# A NWG S NTH - EDI 1
-# A NWG S NTH H 50
-# A NWG S NTH 50
 
-# A Hol S NTH-Bel 2
-# A Mar S Pic-Bel 2
-# A Ber S Pic-Bel 2
-# A Mun S Pic-Bel 2
 
 MY_PROVINCES = 'Bel Bur Hol Swe Nwy NTH Ber Mun'.split()
 MY_SUPPLY_CENTERS = 'Bel Hol Kie Ber Den Mun Nwy Swe'.split()
@@ -40,6 +39,7 @@ SUPPLY_CENTERS = 'Edi Lvp Lon Bel Hol Kie Ber Nwy Swe Den Stp Mos Sev Rum Bul Co
 
 import random
 import re
+import itertools
 
 movePattern = re.compile("([A|F] )?\s*(\w+)\s*-\s*(\w+)\s*(\d+)?")
 holdPattern = re.compile("([A|F] )?\s*(\w+)\s*[H ]?\s*(\d+)?")
@@ -58,7 +58,7 @@ def chance(p):
 
 class Move(object):
   """docstring for Move"""
-  def __init__(self, province, origin, dest, prob, isSupporting):
+  def __init__(self, province, origin, dest, prob, isSupporting, isExtraHoldingMove=False):
     super(Move, self).__init__()
     self.origin = origin
     self.province = province
@@ -68,10 +68,13 @@ class Move(object):
     self.moveFailed = None
     self.finalDest = None
     self.numSupports = 0
+    self.isExtraHoldingMove = isExtraHoldingMove
 
   def p(self):
     print self.s()
-  def s(self):
+  def s(self, printExtras=True):
+    if self.isExtraHoldingMove and not printExtras:
+      return ''
     if self.origin == self.province == self.dest:
       return self.province + ' holds'
     if self.origin == self.province != self.dest:
@@ -136,7 +139,7 @@ def playGame():
       if randomFloat <= runningP:
         # choose this move
         if m.isSupporting:
-          moves.append(Move(m.province, m.province, m.province, m.prob, False))
+          moves.append(Move(m.province, m.province, m.province, m.prob, False, isExtraHoldingMove=True))
         moves.append(m)
         break
   # print [(x.province, x.origin, x.dest) for x in moves]
@@ -155,7 +158,7 @@ def playGame():
       attackedSupports = [x for x in moves if x.isSupporting and x.province == m.dest and m.origin != m.dest]
       for x in attackedSupports:
         x.moveFailed = True
-        print x.s(), 'failed!'
+        # print x.s(), 'failed!'
 
   # execute moves
   for dest in destToMovesMap.keys():
@@ -174,30 +177,48 @@ def playGame():
     assert(len(topMoves) > 0)
     if len(topMoves) == 1:
       topMoves[0].finalDest = topMoves[0].dest
-      print topMoves[0].s(), 'succeeds! numSupports:', topMoves[0].numSupports
+      # print topMoves[0].s(), 'succeeds! numSupports:', topMoves[0].numSupports
     else:
       for x in topMoves:
         if x.origin == x.dest:
           x.finalDest = x.dest
-          print x.s(), 'succeeds! numSupports:', x.numSupports
+          # print x.s(), 'succeeds! numSupports:', x.numSupports
         else:
           x.moveFailed = True
           x.finalDest = x.origin
-          print x.s(), 'bounces! numSupports:', x.numSupports
+          # print x.s(), 'bounces! numSupports:', x.numSupports
 
     for x in lesserMoves:
       x.moveFailed = True
       if x.origin == x.dest:
         x.finalDest = 'RETREAT'
-        print x.s(), 'fails! numSupports:', x.numSupports
+        # print x.s(), 'fails! numSupports:', x.numSupports
       else:
         x.finalDest = x.origin
-        print x.s(), 'fails! numSupports:', x.numSupports
+        # print x.s(), 'fails! numSupports:', x.numSupports
 
     # print x.s(), x.moveFailed
 
-  # score this game
   nonSupportingMoves = [m for m in moves if not m.isSupporting]
+
+  # stop head to heads
+  for m1, m2 in itertools.combinations(nonSupportingMoves, 2):
+    if m1.dest == m2.origin and m2.dest == m1.origin:
+      # print m1.province, m2.province, 'collision!'
+      if m1.numSupports == m2.numSupports:
+        m1.moveFailed = True
+        m2.moveFailed = True
+        m1.finalDest = m1.origin
+        m2.finalDest = m2.origin
+      elif m1.numSupports > m2.numSupports:
+        m2.moveFailed = True
+        m2.finalDest = m2.origin
+      else:
+        m1.moveFailed = True
+        m1.finalDest = m1.origin
+
+
+  # score this game
 
   SCsILost = [x.finalDest for x in nonSupportingMoves if x.finalDest in MY_SUPPLY_CENTERS and x.province not in MY_PROVINCES]
   SCsIGained = [x.finalDest for x in nonSupportingMoves if (x.finalDest not in MY_SUPPLY_CENTERS) and (x.province in MY_PROVINCES) and (x.finalDest in SUPPLY_CENTERS)]
@@ -208,12 +229,32 @@ def playGame():
   #   print  m.finalDest not in MY_SUPPLY_CENTERS and m.province in MY_PROVINCES and m.finalDest in SUPPLY_CENTERS
   #   print ''
 
-  print 'started with', len(MY_SUPPLY_CENTERS), 'SCs. Lost:', len(SCsILost), 'Gained:', len(SCsIGained)
+  # print 'started with', len(MY_SUPPLY_CENTERS), 'SCs. Lost:', len(SCsILost), 'Gained:', len(SCsIGained)
 
-  print SCsILost
-  print SCsIGained
+  # print SCsILost
+  # print SCsIGained
+  myMoves = [m.s(printExtras=False) for m in moves if m.province in MY_PROVINCES and not m.isExtraHoldingMove]
+  return myMoves, len(SCsILost), len(SCsIGained)
 
 # print [(x.origin, x.dest) for x in allMoveList]
 # playGame()
-for i in range(1):
-  playGame()
+
+def scoreGame(myMoves, SCsILost, SCsIGained):
+  return -SCsILost * 1.12 + SCsIGained
+
+movesToScoresMap = dict()
+for i in range(1000):
+  myMoves, SCsILost, SCsIGained = playGame()
+  myMovesStr = ", ".join(myMoves)
+  if myMovesStr not in movesToScoresMap:
+    movesToScoresMap[myMovesStr] = []
+  movesToScoresMap[myMovesStr].append(scoreGame(myMoves, SCsILost, SCsIGained))
+
+movesAndAverageScore = []
+for moveStr in movesToScoresMap:
+  scores = movesToScoresMap[moveStr]
+  movesAndAverageScore.append((moveStr, sum(scores) / len(scores)))
+
+movesAndAverageScore = sorted(movesAndAverageScore, key=lambda x:x[1], reverse=True)
+for move,score in movesAndAverageScore:
+  print score, move
