@@ -1,0 +1,50 @@
+movesString="""
+A Bel H
+A Bur - Par
+A Hol S Bel
+F Swe S Nwy
+F Nwy H
+F NTH S Nwy
+A Ber - Pru
+A Mun - Sil
+
+Hol-Ruh
+Hol-Kie
+Ber-Kie
+Mun-Kie
+Mun S Ber
+Ber S Mun
+Bur S Bel
+NTH-Edi
+
+A Tyr - Mun 7
+Tyr-Vie 5
+
+A Ruh - Hol 10
+Ruh-Kie 4
+Ruh-Bel 8
+A Mar - Bur
+F ENG S Ruh - Bel 7
+ENG S Lon 10
+Pic S ENG 7
+Pic S Ruh-Bel 10
+Edi H 12
+Edi-Lvp 2
+A Lon H
+
+
+F BAR S Stp - Nwy
+A Vie - Tyr
+F NWG S Stp - Nwy 12
+NWG - Edi 3
+A Stp - Nwy
+F Bul/ec H
+A Pru S Sil - Ber 5
+Pru-Ber 10
+A Sil - Ber 5
+Sil S Pru-Ber 10
+"""
+
+
+MY_PROVINCES = 'Bel Bur Hol Swe Nwy NTH Ber Mun'.split()
+MY_SUPPLY_CENTERS = 'Bel Hol Kie Ber Den Mun Nwy Swe'.split()

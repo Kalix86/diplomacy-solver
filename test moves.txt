@@ -1,0 +1,17 @@
+movesString="""
+[ a 8
+A Sil S Kie - Mun
+A Kie - MAO
+]
+[ a 8
+A Sil S Kie - Mun
+A Kie - Mun
+]
+[ a 9
+A Sil - Mun
+A Kie H
+A Hol S Kie
+]
+A Bel H
+A Bel-Pic
+"""
